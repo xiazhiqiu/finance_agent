@@ -1,0 +1,49 @@
+# Tasks
+
+- [x] Task 1: 新建 context-builder.ts（投影 + 紧凑序列化 + 预算 + token 日志）
+  - [x] 1.1 在 `pi-gateway/src/workflow/types.ts` 定义 `InstructionKind`、`FetchScope = "plan" | "customer"`、`LeafPlanContext`；`WorkflowContext.strategies` 改为可选；`BackendClient.fetchContext` 增加 scope 可选参数
+  - [x] 1.2 新建 `pi-gateway/src/workflow/context-builder.ts`：`projectPlanContext`（白名单投影，products 只留 productId/name/category/riskLevel/expectedReturn/tenor，剔除 strategies）、`serializeLeafContext`（紧凑 JSON + 超预算先裁 knowledge/marketBrief + console.log 估算 token）、`buildChatStablePrefix`（客户白名单字段 + summary + knowledge 截断 300 字 + 标识，紧凑输出）
+  - [x] 1.3 新建 `workflow/__tests__/context-builder.test.ts`：投影白名单、strategies 剔除、紧凑无缩进、预算裁剪、chat 前缀构建
+- [x] Task 2: fetchContext scope 化 + HTTP 基建合并
+  - [x] 2.1 `tools/backend-http.ts` 新增导出 `backendPost` / `backendPut`（与 backendGet 同构，支持 body）
+  - [x] 2.2 重写 `workflow/backend-client.ts`：删除私有 loadConfig/buildHeaders/request，复用 `../tools/backend-http.ts`；`fetchContext(id, mgr, scope="plan")`：plan=画像+适配产品+知识库+市场简报并发（市场简报 catch 降级 ""，不再拉 strategies），customer=仅画像；`backendPutSummary`（PUT /api/customers/:id/summary）
+  - [x] 2.3 `insight-batch.ts` createInsightDeps 与 `self-evolve.ts` 两函数改传 `"customer"` scope；`orchestrator.ts` 使用默认 plan scope
+  - [x] 2.4 修正受影响测试（orchestrator/plan-tools 等对 fetchContext 的 mock 签名与 strategies 构造），`pnpm --filter pi-gateway test` 通过
+- [x] Task 3: llm-leaf 紧凑序列化
+  - [x] 3.1 `llm-leaf.ts` buildPrompt：业务上下文经 `projectPlanContext` 投影后 `JSON.stringify`（无缩进）；retryInstructions/previousPlan 同改紧凑；市场简报独立段落逻辑保持
+- [x] Task 4: backend 客户摘要存储与接口
+  - [x] 4.1 `backend/src/store.mjs`：`customerSummariesPath`、`getCustomerSummary(customerId)`、`saveCustomerSummary(summary)`（{ summaries: { customerId: … } } 覆盖式，强制 customerId/updatedAt）
+  - [x] 4.2 `routes/customers.routes.mjs`：`GET /api/customers/:customerId/summary`（无则 null）、`PUT /api/customers/:customerId/summary`（校验 raw 字符串与数组字段后落盘）
+- [x] Task 5: 网关客户摘要生成与节流刷新
+  - [x] 5.1 新建 `workflow/customer-summary.ts`：`buildSummaryPrompt(existing, messages)`（纯函数）+ `runRefreshCustomerSummary({customerId, managerId, messages}, piAgentDir, deps?)`（复用 runLlmJsonOnce，输出校验 + 兜底，PUT 走 backendPutSummary）
+  - [x] 5.2 `agent-session.ts`：runPrompt onFinal 后若 context.customerId 存在，按 Map<customerId, ts> 节流（env `FINANCE_SUMMARY_REFRESH_MS` 默认 600000）fire-and-forget 刷新，消息取自 `getSessionMessages(sessionKey)`，异常仅 console.error
+  - [x] 5.3 新建 `workflow/__tests__/customer-summary.test.ts`（mock deps：prompt 构建、LLM 输出解析、PUT 调用）
+- [x] Task 6: 主对话稳定前缀注入
+  - [x] 6.1 `agent-session.ts`：getOrCreateSession 接收 context，会话创建时并发拉取画像/摘要/知识库（backendGet，任一失败降级），`DefaultResourceLoader({ cwd, agentDir, appendSystemPromptOverride: () => [stablePrefix] })` 注入（不传 systemPromptOverride，保留 .pi/AGENTS.md 基座）；前缀经 `buildChatStablePrefix` 构建。注意：profile 响应现附带 tasks 与合并 tags（团队 ab900020e 变更），必须白名单 pick，禁止整对象注入
+  - [x] 6.2 runPrompt 移除 `[会话上下文]` 消息拼接，直接 `session.prompt(message)`；`stripContextPrefix` 保留
+- [x] Task 7: 市场简报数据源
+  - [x] 7.1 backend `store.mjs` 增加 `getMarketBrief()/saveMarketBrief(content)`（`.runtime/data/market_brief.json`，缺省 ""）；新增 market 路由 `GET/PUT /api/market/brief` 并在 routes/index.mjs 注册（manager 相位）
+  - [x] 7.2 `tools/customer-analyze.ts` 新增 `market_query` 工具（无参，GET /api/market/brief，空则「暂无市场简报」）并加入 createCustomTools；`.pi/AGENTS.md` 工具清单补充 market_query 一行
+- [x] Task 8: SDK compaction 启用与端点
+  - [x] 8.1 `.pi/settings.json`：`compaction.enabled` 改 true（其余键不动）
+  - [x] 8.2 `agent-session.ts`：handleEvent 增加 `compaction_start/compaction_end` 分支打日志；新增 `compactSession(sessionKey, customInstructions?)`（getOrCreateSession + session.compact）
+  - [x] 8.3 `handlers.ts` + `server.ts`：`POST /api/sessions/:sessionKey/compact`（body 可选 {customInstructions}），置于现有 GET /api/sessions/ 分发之前
+- [x] Task 9: 工具结果白名单截断
+  - [x] 9.1 `product_query` 回灌行去掉 minAmount 与 campaigns，仅保留 productId/name/category/riskLevel/tenor/expectedReturn；其余工具（plan-tools/customer_analyze/get_plan）核对已合规不改动
+- [x] Task 10: token 可观测
+  - [x] 10.1 context-builder 序列化输出估算 token 日志（Task 1 已含，此处核对）；`agent-session.ts` message_end 分支在消息携带 usage 时输出 `[agent-session] usage` 日志（可选链守卫，无则跳过）
+- [x] Task 11: 文档同步
+  - [x] 11.1 `finclaw/docs/data-dictionary.md`：运行时数据表新增 customer_summaries.json / market_brief.json；4.1 WorkflowContext 的 strategies 改可选 + fetchContext scope 说明；第 6 章 SSE 协议「[会话上下文] 前缀注入」描述改为系统提示稳定前缀注入；7.2 环境变量表新增 FINANCE_SUMMARY_REFRESH_MS
+  - [x] 11.2 `finclaw/docs/api-reference.md`：新增 GET/PUT /api/customers/:id/summary、GET/PUT /api/market/brief、POST /api/sessions/:sessionKey/compact 条目（对齐现有条目格式）
+- [x] Task 12: 全量验证
+  - [x] 12.1 `pnpm --filter pi-gateway test` 全绿；`pnpm --filter pi-gateway exec tsc --noEmit` 无错误
+  - [x] 12.2 启动 backend + gateway 冒烟：主对话请求（消息无前缀、稳定前缀注入）、方案生成（投影后 prompt）、摘要落盘、market_query、compact 端点 200
+
+# Task Dependencies
+- Task 3 依赖 Task 1（projectPlanContext）
+- Task 5 依赖 Task 4（backend summary API）
+- Task 6 依赖 Task 1（buildChatStablePrefix）与 Task 4（摘要 API）
+- Task 2 与 Task 4、Task 7、Task 8、Task 9 相互独立可并行
+- Task 10 依赖 Task 1
+- Task 11 依赖 Task 4、7、8（端点确定后写文档）
+- Task 12 依赖全部

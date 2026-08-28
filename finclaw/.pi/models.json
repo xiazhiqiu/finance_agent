@@ -1,0 +1,12 @@
+{
+  "providers": {
+    "deepseek": {
+      "modelOverrides": {
+        "deepseek-v4-flash": {
+          "contextWindow": 64000,
+          "maxTokens": 8192
+        }
+      }
+    }
+  }
+}

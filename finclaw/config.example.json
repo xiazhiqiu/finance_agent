@@ -1,0 +1,14 @@
+{
+  "ports": {
+    "backend": 3001,
+    "gateway": 18789,
+    "web": 4174
+  },
+  "gateway": {
+    "authToken": "finance-local-token"
+  },
+  "agent": {
+    "id": "wealth-advisor",
+    "managerId": "manager-local"
+  }
+}

@@ -1,0 +1,49 @@
+# Never commit secrets / local env (contains API keys)
+.env
+
+# Local model configuration and runtime data
+finclaw/config.json
+finclaw/.runtime/
+finclaw/web/.env.local
+finclaw/.pi/auth.json
+finclaw/.pi/**/auth.json
+finclaw/.pi/sessions/
+finclaw/.pi/bin/
+finclaw/.pi/.runtime/
+finclaw/.pi/models-store.json
+
+# Dependencies and build outputs
+**/node_modules/
+**/dist/
+
+# Local tooling
+.DS_Store
+Thumbs.db
+*.log
+.serena/
+
+# pi-agent source archive and extracted reference (not part of project)
+pi-main/
+pi-main.zip
+
+# Local test scripts and reports (self-maintained, not tracked)
+test/
+
+# Local test scratch files (curl cookie jar, API response samples)
+finclaw/cookies.txt
+finclaw/cust.json
+
+# Tool runtime memory
+.workbuddy/
+
+# Local pi agent root (root-level empty auth.json leftover)
+/pi/
+# 项目的 skill 插件（.pi/skills/<name>/SKILL.md）是受版本控制的业务资产
+!finclaw/.pi/skills/
+
+# Gateway runtime scratch
+finclaw/pi-gateway/.runtime/
+
+# Windows reserved name artifacts
+finclaw/nul
+finclaw/.pi/nul
